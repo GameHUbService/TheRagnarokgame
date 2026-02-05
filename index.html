@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lluvia de Besos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- ESTILOS GENERALES --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: white;
+        }
+
+        /* --- CONTENEDOR DEL JUEGO (9:16) --- */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 56.25vh;
+            max-height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Fondos e Imágenes */
+        .bg-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        .blurred {
+            filter: blur(8px);
+            -webkit-filter: blur(8px);
+        }
+
+        /* --- PANTALLAS (CANVAS) --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .active { display: flex; }
+
+        /* --- ESTILOS INSTRUCCIONES --- */
+        @keyframes levitate {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0); }
+        }
+
+        #suegra-demo {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            margin-bottom: 20px;
+            animation: levitate 3s ease-in-out infinite;
+        }
+
+        .instructions-box {
+            background: rgba(0,0,0,0.75);
+            padding: 30px;
+            border-radius: 20px;
+            z-index: 20;
+            max-width: 85%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Textos y Botones */
+        h1, h2, p {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            z-index: 20;
+        }
+        
+        h2 { font-size: 1.8rem; color: #ffeb3b; font-weight: 700; }
+        p { font-size: 1.3rem; line-height: 1.5; font-weight: 400; }
+
+        .btn {
+            padding: 15px 40px;
+            margin: 15px;
+            font-size: 1.4rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 700;
+            text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+            z-index: 20;
+            letter-spacing: 1px;
+        }
+        
+        .btn:active { 
+            transform: scale(0.95); 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .btn-play {
+            background: linear-gradient(45deg, #4CAF50, #81C784);
+            color: white;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .btn-restart { background-color: #2196F3; color: white; }
+        .btn-end { background-color: #f44336; color: white; }
+
+        /* Estilo para la Foto Final (Marco tipo cuadro) */
+        .photo-frame {
+            width: 220px;
+            height: 220px;
+            border: 5px solid #fff;
+            border-radius: 15px;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            background-color: #000;
+        }
+
+        /* --- GAMEPLAY UI --- */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 5;
+            font-size: 1.4rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #player {
+            position: absolute;
+            bottom: 20px;
+            width: 187px; 
+            height: 187px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        #player img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .falling-object {
+            position: absolute;
+            z-index: 4;
+        }
+        
+        .falling-object img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="screen-start" class="screen active" onclick="goToInstructions()">
+            <img src="images/Canva_inicial.jpg" class="bg-img" alt="Inicio">
+            <div style="position:absolute; width:100%; height:100%; top:0; left:0; z-index: 30;"></div>
+        </div>
+
+        <div id="screen-instructions" class="screen">
+            <img src="images/Background_general.jpg" class="bg-img blurred" alt="Fondo">
+            <div class="instructions-box">
+                <img src="images/Obstáculo_suegra.png" alt="Suegra Macabra" id="suegra-demo">
+                <p style="margin-bottom: 30px;">Es hora, vamos a luchar por el futuro, toma el poder de THOR pero ten cuidado con LOKI.</p>
+                <button class="btn btn-play" onclick="playBtnSound(); startGame()">Jugar ahora</button>
+            </div>
+        </div>
+
+        <div id="screen-game" class="screen" style="display: none; cursor: none;">
+            <img src="images/Background_general.jpg" class="bg-img" alt="Fondo Juego">
+            
+            <div id="ui-layer">
+                <span id="score-display">Puntos: 0</span>
+                <span id="time-display">0s</span>
+            </div>
+
+            <div id="player">
+                <img src="images/Personaje_principal.png" alt="Personaje" onerror="this.src='images/Personaje_principal.jpg'">
+            </div>
+            
+            <div id="game-area"></div>
+        </div>
+
+        <div id="screen-lose" class="screen">
+            <img src="images/Background_general.jpg" class="bg-img blurred" alt="Fondo">
+            <div style="background: rgba(0,0,0,0.75); padding: 30px; border-radius: 20px; z-index: 20; max-width: 85%;">
+                <h2>¡Upss!</h2>
+                <p>LOKI nos dejó sin energía.</p>
+            </div>
+            <div style="margin-top: 30px; z-index: 20;">
+                <button class="btn btn-restart" onclick="playBtnSound(); startGame()">Reiniciar</button>
+                <button class="btn btn-end" onclick="playBtnSound(); goToStart()">Terminar</button>
+            </div>
+        </div>
+
+        <div id="screen-win" class="screen">
+            <img src="images/Background_general.jpg" class="bg-img blurred" alt="Fondo">
+            <div style="background: rgba(0,0,0,0.75); padding: 30px; border-radius: 20px; z-index: 20; width: 85%;">
+                <h2>¡Esoooo!</h2>
+                <p>El BIFROST es abrió para nuestro futuro.</p>
+                
+                <div class="photo-frame">
+                    <img src="images/Foto_final.jpg" alt="Foto Final" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+
+            </div>
+            <div style="margin-top: 30px; z-index: 20;">
+                <button class="btn btn-restart" onclick="playBtnSound(); startGame()">Reiniciar</button>
+                <button class="btn btn-end" onclick="playBtnSound(); goToStart()">Terminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- CONSTANTES DE AUDIO --- */
+        const AUDIOS = {
+            background: new Audio('sound/Background_sound.mp3'),
+            btn: new Audio('sound/botón_sound.mp3'),
+            lose: new Audio('sound/lose_sound.mp3'),
+            premio: new Audio('sound/Premios_sound.mp3'),
+            win: new Audio('sound/Winner_game.mp3')
+        };
+        
+        AUDIOS.background.loop = true;
+        AUDIOS.background.volume = 0.5; 
+
+        function playSound(audioObj) {
+            audioObj.currentTime = 0; 
+            audioObj.play().catch(e => console.log("Error sfx:", e));
+        }
+
+        function playBtnSound() {
+            playSound(AUDIOS.btn);
+        }
+
+        /* --- CONFIGURACIÓN DE ASSETS --- */
+        const ASSETS = {
+            premio1: { src: 'images/Premio-1.png', score: 0, w: 150, h: 150, type: 'good' },
+            premio2: { src: 'images/Premio-2.png', score: 5, w: 150, h: 150, type: 'good' }, 
+            premio3: { src: 'images/Premio-3.png', score: 100, w: 180, h: 180, type: 'win' },
+            suegra:  { src: 'images/Obstáculo_suegra.png', score: 0, w: 105, h: 105, type: 'bad' }
+        };
+
+        /* --- VARIABLES GLOBALES --- */
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const gameArea = document.getElementById('game-area');
+        const scoreDisplay = document.getElementById('score-display');
+        const timeDisplay = document.getElementById('time-display');
+
+        let score = 0;
+        let gameTime = 0;
+        let isPlaying = false;
+        let gameLoopId, spawnerId, timerId;
+        let objects = [];
+        let playerX = 50; 
+        let speedMultiplier = 1;
+
+        let finalPrizeCaught = false; 
+        let finalPrizeOnScreen = false;
+        let nextFinalPrizeSpawnTime = 20; 
+
+        /* --- NAVEGACIÓN --- */
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => {
+                s.classList.remove('active');
+                s.style.display = 'none';
+            });
+            const screen = document.getElementById(screenId);
+            screen.style.display = 'flex';
+            setTimeout(() => screen.classList.add('active'), 10);
+        }
+
+        // Se ejecuta al tocar el primer canva
+        function goToInstructions() { 
+            // INTENTAR REPRODUCIR AUDIO AQUÍ MISMO
+            AUDIOS.background.play().catch(e => console.log("Audio play failed:", e));
+            showScreen('screen-instructions'); 
+        }
+        
+        function goToStart() { 
+            stopGame(true); // Detiene música al volver al inicio
+            showScreen('screen-start'); 
+        }
+
+        /* --- LOGICA DEL JUEGO --- */
+        function startGame() {
+            // Detener lógica del juego anterior, pero NO la música si ya está sonando
+            stopGame(false); 
+
+            // Verificar si la música está pausada (ej: venimos de Game Over) y darle play
+            if (AUDIOS.background.paused) {
+                AUDIOS.background.currentTime = 0;
+                AUDIOS.background.play().catch(e => console.log("Autoplay error:", e));
+            }
+
+            score = 0;
+            gameTime = 0;
+            speedMultiplier = 1;
+            playerX = 50;
+            
+            finalPrizeCaught = false;
+            finalPrizeOnScreen = false;
+            nextFinalPrizeSpawnTime = 20;
+
+            updateScore();
+            updatePlayerPosition();
+            
+            showScreen('screen-game');
+            isPlaying = true;
+
+            timerId = setInterval(() => {
+                gameTime++;
+                timeDisplay.innerText = gameTime + 's';
+                
+                if (gameTime % 5 === 0) speedMultiplier += 0.2;
+                
+                if (gameTime >= 20 && !finalPrizeCaught && !finalPrizeOnScreen && gameTime >= nextFinalPrizeSpawnTime) {
+                    let randomDelay = Math.random() * 3000; 
+                    setTimeout(spawnFinalPrize, randomDelay);
+                    nextFinalPrizeSpawnTime = gameTime + 5;
+                }
+                
+            }, 1000);
+
+            gameLoopId = requestAnimationFrame(gameLoop);
+            spawnerLogic();
+        }
+
+        // Función unificada para detener
+        function stopGame(stopMusic) {
+            isPlaying = false;
+            cancelAnimationFrame(gameLoopId);
+            clearInterval(timerId);
+            clearTimeout(spawnerId);
+            objects.forEach(obj => obj.element.remove());
+            objects = [];
+            gameArea.innerHTML = '';
+
+            if (stopMusic) {
+                AUDIOS.background.pause();
+                AUDIOS.background.currentTime = 0;
+            }
+        }
+
+        /* --- GENERACIÓN DE OBJETOS --- */
+        function spawnerLogic() {
+            if (!isPlaying) return;
+
+            spawnRandomObject();
+
+            let spawnRate = Math.max(300, 850 - (gameTime * 18)); 
+            spawnerId = setTimeout(spawnerLogic, spawnRate);
+        }
+
+        function createObject(typeDef, xPos) {
+            const el = document.createElement('img');
+            el.src = typeDef.src;
+            el.className = 'falling-object';
+            el.style.width = typeDef.w + 'px';
+            el.style.height = typeDef.h + 'px';
+            el.style.left = xPos + '%';
+            el.style.top = '-150px'; 
+            el.onerror = function() { console.log("Falta imagen: " + typeDef.src); };
+
+            gameArea.appendChild(el);
+
+            let speed;
+            if (typeDef.type === 'win') {
+                speed = 1.5; 
+            } else {
+                let baseSpeed = typeDef.type === 'bad' ? 2.5 : 4.5;
+                speed = (baseSpeed + Math.random() * 2) * speedMultiplier;
+            }
+            
+            return {
+                element: el,
+                x: xPos,
+                y: -150,
+                w: typeDef.w,
+                h: typeDef.h,
+                type: typeDef.type,
+                score: typeDef.score,
+                speed: speed
+            };
+        }
+
+        function spawnRandomObject() {
+            const rand = Math.random();
+            let objDef;
+            
+            if (rand < 0.40) {
+                objDef = ASSETS.suegra;
+            } else if (rand < 0.80) {
+                objDef = ASSETS.premio1;
+            } else {
+                objDef = ASSETS.premio2;
+            }
+
+            const randomX = 10 + Math.random() * 80;
+            objects.push(createObject(objDef, randomX));
+        }
+
+        function spawnFinalPrize() {
+            if (!isPlaying || finalPrizeCaught || finalPrizeOnScreen) return;
+            finalPrizeOnScreen = true;
+            const randomX = 30 + Math.random() * 40; 
+            objects.push(createObject(ASSETS.premio3, randomX));
+        }
+
+        /* --- MOVIMIENTO Y FÍSICAS --- */
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            for (let i = objects.length - 1; i >= 0; i--) {
+                let obj = objects[i];
+                obj.y += obj.speed;
+                obj.element.style.top = obj.y + 'px';
+
+                if (checkCollision(player, obj)) {
+                    handleCollision(obj);
+                    obj.element.remove();
+                    objects.splice(i, 1);
+                    continue;
+                }
+
+                if (obj.y > gameContainer.offsetHeight) {
+                    if (obj.type === 'win') {
+                        finalPrizeOnScreen = false;
+                        nextFinalPrizeSpawnTime = gameTime + 5; 
+                    }
+                    obj.element.remove();
+                    objects.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* --- CONTROLES --- */
+        function movePlayer(clientX) {
+            if (!isPlaying) return;
+            const rect = gameContainer.getBoundingClientRect();
+            let x = clientX - rect.left;
+            let percent = (x / rect.width) * 100;
+            if (percent < 10) percent = 10;
+            if (percent > 90) percent = 90;
+            playerX = percent;
+            updatePlayerPosition();
+        }
+
+        function updatePlayerPosition() {
+            player.style.left = `calc(${playerX}% - 93.5px)`;
+        }
+
+        gameContainer.addEventListener('mousemove', (e) => movePlayer(e.clientX));
+        gameContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault(); 
+            movePlayer(e.touches[0].clientX);
+        }, { passive: false });
+
+        /* --- COLISIONES --- */
+        function checkCollision(playerEl, objData) {
+            const pRect = playerEl.getBoundingClientRect();
+            const oRect = objData.element.getBoundingClientRect();
+            
+            const paddingX = 25; 
+            const paddingY = 15;
+
+            return !(
+                ((pRect.top + paddingY) > (oRect.bottom - paddingY)) ||
+                ((pRect.bottom - paddingY) < (oRect.top + paddingY)) ||
+                ((pRect.right - paddingX) < (oRect.left + paddingX)) ||
+                ((pRect.left + paddingX) > (oRect.right - paddingX))
+            );
+        }
+
+        function handleCollision(obj) {
+            if (obj.type === 'good') {
+                score += obj.score;
+                updateScore();
+                if (obj.score === 5) {
+                    playSound(AUDIOS.premio);
+                }
+            } else if (obj.type === 'win') {
+                finalPrizeCaught = true;
+                // Detener música background y sonar victoria
+                AUDIOS.background.pause();
+                playSound(AUDIOS.win);
+                
+                setTimeout(() => showScreen('screen-win'), 200);
+                isPlaying = false;
+            } else if (obj.type === 'bad') {
+                // Detener música background y sonar derrota
+                AUDIOS.background.pause();
+                playSound(AUDIOS.lose);
+
+                setTimeout(() => showScreen('screen-lose'), 200);
+                isPlaying = false;
+            }
+        }
+
+        function updateScore() { scoreDisplay.innerText = "Puntos: " + score; }
+
+    </script>
+</body>
+</html>
